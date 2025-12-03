@@ -1,26 +1,26 @@
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from transformers import AutoTokenizer, AutoModel
 from torch.utils.data import Dataset, DataLoader
 
-#############################################
-# 1 — Mini dataset d'exemple
-#############################################
+########################################################
+# 1 — Mini dataset très simple (garanti sans erreur)
+########################################################
 
 class SimpleDataset(Dataset):
     def __init__(self, tokenizer):
-        texts = [
+        self.texts = [
             "I love this movie!",
             "This product is terrible.",
             "Amazing experience.",
             "I hate this."
         ]
-        labels = [1, 0, 1, 0]
+        self.labels = torch.tensor([1, 0, 1, 0])
 
-        self.labels = torch.tensor(labels)
         self.tokens = tokenizer(
-            texts,
+            self.texts,
             padding=True,
             truncation=True,
             max_length=128,
@@ -37,16 +37,18 @@ class SimpleDataset(Dataset):
             "label": self.labels[idx]
         }
 
-#############################################
-# 2 — LSTM Classifier
-#############################################
+########################################################
+# 2 — Modèle LSTM simple
+########################################################
 
 class LSTMClassifier(nn.Module):
     def __init__(self, embedding_dim=768, hidden_dim=128, num_classes=2):
         super().__init__()
         self.lstm = nn.LSTM(
-            embedding_dim, hidden_dim,
-            batch_first=True, bidirectional=True
+            embedding_dim,
+            hidden_dim,
+            batch_first=True,
+            bidirectional=True
         )
         self.fc = nn.Linear(hidden_dim * 2, num_classes)
 
@@ -54,27 +56,30 @@ class LSTMClassifier(nn.Module):
         lstm_out, _ = self.lstm(embeddings)
         return self.fc(lstm_out[:, -1, :])
 
-#############################################
+########################################################
 # 3 — Entraînement
-#############################################
+########################################################
 
 def train():
-    print("Loading tokenizer and BERT...")
+    print("➡️ Loading tokenizer and BERT...")
     tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased")
     bert = AutoModel.from_pretrained("distilbert-base-uncased")
     bert.eval()
 
+    # On fige BERT
     for p in bert.parameters():
         p.requires_grad = False
 
+    print("➡️ Preparing dataset...")
     dataset = SimpleDataset(tokenizer)
     loader = DataLoader(dataset, batch_size=2, shuffle=True)
 
+    print("➡️ Initializing LSTM model...")
     model = LSTMClassifier()
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=2e-5)
 
-    print("Training...")
+    print("➡️ Starting training loop...")
     for epoch in range(3):
         losses = []
         for batch in loader:
@@ -94,6 +99,24 @@ def train():
 
             losses.append(loss.item())
 
-        print(f"Epoch {epoch+1} | Loss = {sum(losses)/len(losses):.4f}")
+        print(f"✔️ Epoch {epoch+1} finished — Loss: {sum(losses)/len(losses):.4f}")
 
-    print("Saving model...")
+    ########################################################
+    # 4 — Sauvegarde avec debug garanti
+    ########################################################
+
+    print("\n➡️ Checking current directory before save:")
+    print(os.listdir("."))
+
+    print("➡️ Saving model into model.pth...")
+    torch.save(model.state_dict(), "model.pth")
+
+    print("✔️ model.pth saved successfully!")
+    print("\n➡️ Checking directory after save:")
+    print(os.listdir("."))
+
+    print("\n🎉 Training and saving finished with success!")
+
+
+if __name__ == "__main__":
+    train()
